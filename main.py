@@ -12,7 +12,7 @@ source_channel = 'OddAlertsBot'
 target_chat = -1002160063925
 
 # A TelegramClient inicializálása bot token-nel
-client = TelegramClient('tipp_session', api_id, api_hash, timeout=30)
+client = TelegramClient('bot', api_id, api_hash).start(bot_token='7951953035:AAHvvswK0L4H1SwQn071eo6_pG13C4HYY50')
 
 # Hónapnevek magyar fordítása
 honapok = {

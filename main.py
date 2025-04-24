@@ -10,7 +10,7 @@ api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e')  #
 source_channel = 'OddAlertsBot'
 target_chat = -1002160063925
 
-client = TelegramClient('tipp_session', api_id, api_hash)
+client = TelegramClient('bot', api_id, api_hash).start(bot_token='7951953035:AAHvvswK0L4H1SwQn071eo6_pG13C4HYY50')
 
 # Hónapnevek magyar fordítása
 honapok = {

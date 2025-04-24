@@ -6,9 +6,12 @@ import os
 # SAJÁT ADATOK
 api_id = int(os.getenv('TELEGRAM_API_ID', '26323340'))
 api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e')
+# Bot token környezeti változóként
+bot_token = os.getenv('TELEGRAM_BOT_TOKEN')  # Adj hozzá egy bot token-t a Render környezeti változókhoz
 source_channel = 'OddAlertsBot'
 target_chat = -1002160063925
 
+# A TelegramClient inicializálása bot token-nel
 client = TelegramClient('tipp_session', api_id, api_hash, timeout=30)
 
 # Hónapnevek magyar fordítása
@@ -87,7 +90,7 @@ def format_tip(szoveg, tipp_tipus=None):
                 honap = ma.month
 
             try:
-                meccs_ido = datetime(ev, honap, nap, ora, perc)  # Hiányzó ) hozzáadva
+                meccs_ido = datetime(ev, honap, nap, ora, perc)
                 meccs_ido += timedelta(hours=1)  # Időzóna korrekció (GMT -> CET)
 
                 # Hónap nevének kinyerése és fordítása
@@ -217,6 +220,9 @@ async def on_start():
     except Exception as e:
         print(f"Hiba a kezdeti üzenet küldésekor: {e}")
 
+# Bot indítása bot token-nel
 with client:
+    # A bot token-t használjuk a bejelentkezéshez
+    client.start(bot_token=bot_token)
     client.loop.run_until_complete(on_start())
     client.run_until_disconnected()

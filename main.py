@@ -5,12 +5,11 @@ import os
 
 # SAJÁT ADATOK
 api_id = int(os.getenv('TELEGRAM_API_ID', '26323340'))
-api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e')  # Felesleges ) eltávolítva
-
+api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e'))
 source_channel = 'OddAlertsBot'
 target_chat = -1002160063925
 
-client = TelegramClient('bot', api_id, api_hash).start(bot_token='7951953035:AAHvvswK0L4H1SwQn071eo6_pG13C4HYY50')
+client = TelegramClient('tipp_session', api_id, api_hash, timeout=30)
 
 # Hónapnevek magyar fordítása
 honapok = {
@@ -29,9 +28,11 @@ honapok = {
 }
 
 def format_tip(szoveg, tipp_tipus=None):
+    print(f"Feldolgozás alatt: {szoveg}")  # Naplózás
     # Tipp típusa
     tipp = ''
     if tipp_tipus:
+        print(f"Tipp típus: {tipp_tipus}")  # Naplózás
         if 'Home Win' in tipp_tipus:
             tipp = 'Hazai győzelem'
         elif 'Away Win' in tipp_tipus:
@@ -43,66 +44,100 @@ def format_tip(szoveg, tipp_tipus=None):
             if gól_tipp:
                 szam = gól_tipp.group(1)
                 tipp = f'Több mint {szam} gól' if float(szam) > 0 else f'Kevesebb mint {abs(float(szam))} gól'
+            else:
+                print("Nem ismert tipp típus.")  # Naplózás
 
     # Csapatok
-    meccs = re.search(r'🆚 (.*?)\n', szoveg)
-    csapatok = meccs.group(1) if meccs else 'Nincs adat'
+    try:
+        meccs = re.search(r'🆚 (.*?)\n', szoveg)
+        csapatok = meccs.group(1) if meccs else 'Nincs adat'
+        print(f"Csapatok: {csapatok}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba a csapatok kinyerésekor: {e}")
+        csapatok = 'Hiba a csapatoknál'
 
     # Liga
-    liga = re.search(r'🏆 (.*?)\n', szoveg)
-    liga_nev = liga.group(1).strip() if liga else 'Nincs adat'
+    try:
+        liga = re.search(r'🏆 (.*?)\n', szoveg)
+        liga_nev = liga.group(1).strip() if liga else 'Nincs adat'
+        print(f"Liga: {liga_nev}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba a liga kinyerésekor: {e}")
+        liga_nev = 'Hiba a ligánál'
 
     # Időpont
-    datum_match = re.search(r'📆 .*? (\d+)(?:st|nd|rd|th)? at (\d{2}):(\d{2})\s*\(GMT\)', szoveg)
-    if datum_match:
-        nap = int(datum_match.group(1))
-        ora = int(datum_match.group(2))
-        perc = int(datum_match.group(3))
-        ma = datetime.now()
+    try:
+        datum_match = re.search(r'📆 .*? (\d+)(?:st|nd|rd|th)? at (\d{2}):(\d{2})\s*\(GMT\)', szoveg)
+        if datum_match:
+            nap = int(datum_match.group(1))
+            ora = int(datum_match.group(2))
+            perc = int(datum_match.group(3))
+            ma = datetime.now()
 
-        # Hónap és év meghatározása
-        if nap < ma.day:
-            if ma.month == 12:
-                ev = ma.year + 1
-                honap = 1
+            # Hónap és év meghatározása
+            if nap < ma.day:
+                if ma.month == 12:
+                    ev = ma.year + 1
+                    honap = 1
+                else:
+                    ev = ma.year
+                    honap = ma.month + 1
             else:
                 ev = ma.year
-                honap = ma.month + 1
+                honap = ma.month
+
+            try:
+                meccs_ido = datetime(ev, honap, nap, ora, perc)
+                meccs_ido += timedelta(hours=1)  # Időzóna korrekció (GMT -> CET)
+
+                # Hónap nevének kinyerése és fordítása
+                honap_nev = meccs_ido.strftime("%B")
+                honap_magyar = honapok.get(honap_nev, honap_nev)
+
+                # Dátum formázása
+                datum_str = f"{honap_magyar}. %-d. (%A) – %H:%M"
+                datum_str = meccs_ido.strftime(datum_str).replace('Monday', 'Hétfő')\
+                    .replace('Tuesday', 'Kedd').replace('Wednesday', 'Szerda')\
+                    .replace('Thursday', 'Csütörtök').replace('Friday', 'Péntek')\
+                    .replace('Saturday', 'Szombat').replace('Sunday', 'Vasárnap')
+            except ValueError as e:
+                print(f"Hiba a dátum formázásakor: {e}")
+                datum_str = 'Érvénytelen dátum'
         else:
-            ev = ma.year
-            honap = ma.month
-
-        try:
-            meccs_ido = datetime(ev, honap, nap, ora, perc)
-            meccs_ido += timedelta(hours=1)  # Időzóna korrekció (GMT -> CET)
-
-            # Hónap nevének kinyerése és fordítása
-            honap_nev = meccs_ido.strftime("%B")
-            honap_magyar = honapok.get(honap_nev, honap_nev)
-
-            # Dátum formázása
-            datum_str = f"{honap_magyar}. %-d. (%A) – %H:%M"
-            datum_str = meccs_ido.strftime(datum_str).replace('Monday', 'Hétfő')\
-                .replace('Tuesday', 'Kedd').replace('Wednesday', 'Szerda')\
-                .replace('Thursday', 'Csütörtök').replace('Friday', 'Péntek')\
-                .replace('Saturday', 'Szombat').replace('Sunday', 'Vasárnap')
-        except ValueError:
-            datum_str = 'Érvénytelen dátum'
-    else:
-        datum_str = 'Nincs dátum'
+            datum_str = 'Nincs dátum'
+        print(f"Dátum: {datum_str}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba a dátum kinyerésekor: {e}")
+        datum_str = 'Hiba a dátumnál'
 
     # Valószínűség és fair odds
-    prob = re.search(r'Probability[:\s]*([\d\.]+)%\s*\(([\d\.]+)\)', szoveg)
-    valoszinuseg = prob.group(1) if prob else 'Nincs adat'
-    fair_odds = prob.group(2) if prob else 'Nincs adat'
+    try:
+        prob = re.search(r'Probability[:\s]*([\d\.]+)%\s*\(([\d\.]+)\)', szoveg)
+        valoszinuseg = prob.group(1) if prob else 'Nincs adat'
+        fair_odds = prob.group(2) if prob else 'Nincs adat'
+        print(f"Valószínűség: {valoszinuseg}, Fair odds: {fair_odds}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba a valószínűség kinyerésekor: {e}")
+        valoszinuseg = 'Hiba'
+        fair_odds = 'Hiba'
 
     # Odds
-    odds = re.search(r'Odds[:\s]*([\d\.]+)', szoveg)
-    odds_ertek = odds.group(1) if odds else 'Nincs adat'
+    try:
+        odds = re.search(r'Odds[:\s]*([\d\.]+)', szoveg)
+        odds_ertek = odds.group(1) if odds else 'Nincs adat'
+        print(f"Odds: {odds_ertek}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba az odds kinyerésekor: {e}")
+        odds_ertek = 'Hiba'
 
     # Value
-    value = re.search(r'Value[:\s]*([\d\.]+)%', szoveg)
-    value_szazalek = '+' + value.group(1) if value else 'Nincs adat'
+    try:
+        value = re.search(r'Value[:\s]*([\d\.]+)%', szoveg)
+        value_szazalek = '+' + value.group(1) if value else 'Nincs adat'
+        print(f"Value: {value_szazalek}")  # Naplózás
+    except Exception as e:
+        print(f"Hiba a value kinyerésekor: {e}")
+        value_szazalek = 'Hiba'
 
     # Kimenet
     return (
@@ -117,34 +152,70 @@ def format_tip(szoveg, tipp_tipus=None):
 
 @client.on(events.NewMessage(chats=source_channel))
 async def handler(event):
-    teljes_szoveg = event.message.message
+    try:
+        # 1. Üzenet kinyerése és naplózása
+        teljes_szoveg = event.message.message
+        print(f"Új üzenet érkezett az OddAlertsBot-tól: {teljes_szoveg}")
 
-    # Ellenőrizzük, hogy Value Bet-e az üzenet
-    if "Value" not in teljes_szoveg:
-        return  # Ha nem Value Bet, csendben kilépünk, nem küldünk semmit
+        # 2. Ellenőrizzük, hogy Value Bet-e az üzenet
+        if "Value" not in teljes_szoveg:
+            print("Nem Value Bet, kihagyom az üzenetet.")
+            return  # Ha nem Value Bet, csendben kilépünk
 
-    # Tipp típusának kinyerése
-    tipp_tipus_match = re.search(r'⚙️ (.*?)\n', teljes_szoveg)
-    tipp_tipus = tipp_tipus_match.group(1).strip() if tipp_tipus_match else None
+        print("Value Bet észlelve, folytatom a feldolgozást...")
 
-    if not tipp_tipus:
-        await client.send_message(target_chat, "⚠️ Nem található tipp típus az üzenetben!")
-        return
+        # 3. Tipp típusának kinyerése
+        try:
+            tipp_tipus_match = re.search(r'⚙️ (.*?)\n', teljes_szoveg)
+            tipp_tipus = tipp_tipus_match.group(1).strip() if tipp_tipus_match else None
+            if not tipp_tipus:
+                print("Nem található tipp típus az üzenetben!")
+                await client.send_message(target_chat, "⚠️ Nem található tipp típus az üzenetben!")
+                return
+            print(f"Tipp típus kinyerve: {tipp_tipus}")
+        except Exception as e:
+            print(f"Hiba a tipp típus kinyerésekor: {e}")
+            await client.send_message(target_chat, f"⚠️ Hiba a tipp típus kinyerésekor: {e}")
+            return
 
-    # Meccsek szétválasztása
-    meccs_blokkok = re.split(r'(?=🆚 )', teljes_szoveg)
+        # 4. Meccsek szétválasztása
+        try:
+            meccs_blokkok = re.split(r'(?=🆚 )', teljes_szoveg)
+            print(f"Meccs blokkok száma: {len(meccs_blokkok)}")
+        except Exception as e:
+            print(f"Hiba a meccsek szétválasztásakor: {e}")
+            await client.send_message(target_chat, f"⚠️ Hiba a meccsek szétválasztásakor: {e}")
+            return
 
-    # Blokk feldolgozása
-    for blokk in meccs_blokkok:
-        if '🆚' in blokk:
-            if 'Value' in blokk and 'Probability' in blokk:
-                formazott = format_tip(blokk, tipp_tipus)
-                await client.send_message(target_chat, formazott)
-            else:
-                await client.send_message(target_chat, "⚠️ Hiányos adatok a következő blokkban:\n" + blokk)
+        # 5. Blokk feldolgozása
+        for blokk in meccs_blokkok:
+            try:
+                if '🆚' in blokk:
+                    print(f"Blokk feldolgozása: {blokk}")
+                    # Ellenőrizzük, hogy a blokk tartalmaz-e Value és Probability adatokat
+                    if 'Value' in blokk and 'Probability' in blokk:
+                        print("Value és Probability megtalálva, formázás...")
+                        formazott = format_tip(blokk, tipp_tipus)
+                        print(f"Formázott üzenet: {formazott}")
+                        await client.send_message(target_chat, formazott)
+                        print("Üzenet elküldve a cél csevegésbe.")
+                    else:
+                        print(f"Hiányos adatok a blokkban: {blokk}")
+                        await client.send_message(target_chat, f"⚠️ Hiányos adatok a következő blokkban:\n{blokk}")
+            except Exception as e:
+                print(f"Hiba a blokk feldolgozása közben: {e}")
+                await client.send_message(target_chat, f"⚠️ Hiba a blokk feldolgozása közben: {e}")
+
+    except Exception as e:
+        print(f"Hiba az üzenet teljes feldolgozása közben: {e}")
+        await client.send_message(target_chat, f"⚠️ Hiba az üzenet feldolgozása közben: {e}")
 
 async def on_start():
-    await client.send_message(target_chat, "✅ Új botverzió aktív, csak Value Bet-eket figyelek!")
+    try:
+        await client.send_message(target_chat, "✅ Új botverzió aktív, csak Value Bet-eket figyelek!")
+        print("Kezdeti üzenet elküldve.")
+    except Exception as e:
+        print(f"Hiba a kezdeti üzenet küldésekor: {e}")
 
 with client:
     client.loop.run_until_complete(on_start())

@@ -5,7 +5,7 @@ import os
 
 # SAJÁT ADATOK
 api_id = int(os.getenv('TELEGRAM_API_ID', '26323340'))
-api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e'))
+api_hash = os.getenv('TELEGRAM_API_HASH', '342872321015c5140d34443fa08d712e')
 bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
 
 # Ellenőrizzük, hogy a bot_token létezik-e
